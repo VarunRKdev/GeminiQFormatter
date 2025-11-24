@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gemini Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen px-4 py-10">
+  <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-md space-y-6">
+    <h1 class="text-2xl font-bold text-center text-gray-800">📄 Gemini Question Paper Analyzer</h1>
+
+    <!-- Upload Form -->
+    <form method="POST" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Upload PDF, DOCX, Image or ZIP</label>
+        <input type="file" name="pdf" accept=".pdf,.docx,.jpg,.jpeg,.png,.zip" required class="w-full border px-3 py-2 rounded-md shadow-sm"/>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Enter Prompt</label>
+        <textarea name="prompt" rows="3" required placeholder="e.g., Extract question no., question and marks..." class="w-full border px-3 py-2 rounded-md"></textarea>
+      </div>
+
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md">
+        ✉️ Submit to Gemini
+      </button>
+    </form>
+
+    <!-- View Uploaded File -->
+    {% if filename %}
+      <p class="text-sm mt-2 text-center">
+        {% if view_pdf %}
+          📑 <a href="{{ url_for('view_pdf', filename=filename) }}" target="_blank" class="text-blue-600 underline">View uploaded PDF</a>
+        {% elif view_doc %}
+          📄 <a href="{{ url_for('view_doc', filename=filename) }}" target="_blank" class="text-blue-600 underline">View uploaded DOCX</a>
+        {% elif view_image %}
+          🖼️ <a href="{{ url_for('view_image', filename=filename) }}" target="_blank" class="text-blue-600 underline">View uploaded Image</a>
+        {% endif %}
+      </p>
+    {% endif %}
+
+    <!-- Gemini Response -->
+    {% if response %}
+    <div>
+      <h2 class="text-lg font-semibold text-gray-700 mb-2">🧠 Gemini Response</h2>
+      <div id="response-box" class="bg-gray-50 border p-4 rounded-md whitespace-pre-wrap overflow-auto max-h-96 text-sm text-gray-800">
+        {{ response }}
+      </div>
+
+      <div class="flex gap-4 mt-4">
+        <button onclick="downloadPDF()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md w-full">⬇️ Download as PDF</button>
+        <button onclick="downloadTXT()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md w-full">📜 Download as TXT</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Table Result -->
+    {% if table %}
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold text-gray-700 mb-2">📊 Extracted Table</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border border-gray-300">
+          <thead class="bg-gray-100 text-left">
+            <tr>
+              <th class="px-3 py-2 border">Question No.</th>
+              <th class="px-3 py-2 border">Question</th>
+              <th class="px-3 py-2 border">Marks</th>
+              <th class="px-3 py-2 border">Diagram</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white">
+            {% for row in table %}
+            <tr>
+              <td class="px-3 py-2 border">{{ row["Question No."] }}</td>
+              <td class="px-3 py-2 border">{{ row["Question"] }}</td>
+              <td class="px-3 py-2 border">{{ row["Marks"] }}</td>
+              <td class="px-3 py-2 border">{{ row["Diagram"] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Download Buttons -->
+      <div class="flex gap-4 mt-4">
+        <button onclick="downloadCSV()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md w-full">📥 Download Table as CSV</button>
+        <button onclick="downloadTablePDF()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md w-full">📄 Download Table as PDF</button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Download Scripts -->
+  <script>
+    function downloadTXT() {
+      const text = document.getElementById("response-box").innerText;
+      const blob = new Blob([text], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "gemini_response.txt";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    async function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const text = document.getElementById("response-box").innerText;
+      const lines = doc.splitTextToSize(text, 180);
+      doc.setFont("Times", "Normal");
+      doc.setFontSize(12);
+      let y = 10;
+      for (let i = 0; i < lines.length; i++) {
+        if (y > 280) {
+          doc.addPage();
+          y = 10;
+        }
+        doc.text(lines[i], 10, y);
+        y += 7;
+      }
+      doc.save("gemini_response.pdf");
+    }
+
+    function downloadCSV() {
+      const rows = Array.from(document.querySelectorAll("table tr"));
+      const csv = rows.map(row =>
+        Array.from(row.querySelectorAll("td, th"))
+          .map(cell => `"${cell.innerText}"`)
+          .join(",")
+      ).join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "question_table.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function downloadTablePDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const table = document.querySelector("table");
+      let y = 20;
+
+      doc.setFontSize(14);
+      doc.text("Question Table", 14, 15);
+      doc.setFontSize(10);
+
+      Array.from(table.rows).forEach((row, rowIndex) => {
+        let x = 10;
+        Array.from(row.cells).forEach(cell => {
+          doc.text(cell.innerText, x, y);
+          x += 45;
+        });
+        y += 7;
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+
+      doc.save("question_table.pdf");
+    }
+  </script>
+</body>
+</html>
