@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>View ZIP Images</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .image-container {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      align-items: center;
+    }
+    img {
+      max-width: 90%;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      padding: 10px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h2>📦 Extracted ZIP Images</h2>
+  <div class="image-container">
+    {% for img in images %}
+      <img src="{{ url_for('serve_upload', filename=img) }}" alt="Image {{ loop.index }}">
+    {% endfor %}
+  </div>
+</body>
+</html>
